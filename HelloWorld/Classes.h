@@ -1,40 +1,48 @@
 #pragma once
 #include "Play.h"
 #include "constants.h"
+#include "math.h"
 
-class Apple {
-	public:
-		int radius;
-		MyPoint::Point2D pos;
-		Apple();
-		void draw();  
+struct Position {
+	float x;
+	float y;
+}; 
+
+// An object that isn't the player in this case
+struct AGameObject {
+	Position pos;
+	Color objColor;
+	int radius;
+	void draw();
 };
 
-class SnakePart {
-	public:
-		MyPoint::Point2D pos;
-		Color c;
-		SnakePart(int x, int y);
-		SnakePart();
-		void draw();
+// Basis vectors that make up the object space
+struct BasisVector {
+	float x;
+	float y;
+
+	BasisVector() : x(0), y(0) {}
+	BasisVector(float x, float y) : x(x), y(y) {}
 };
 
-class SnakeHead {
-	public:
-		Heading h;
-		MyPoint::Point2D pos;
-		Color c;
-		int snakeparts;
-		int radius;
-		SnakePart* s;
+struct Player {
+	Position pos;
+	BasisVector origin;
+	BasisVector basisI;
+	BasisVector basisJ;
+	bool debugMode;
+	int radius = 5; // I am aware it's ideal to initialize these in the constructor instead
+	int headSize = 3;
+	float circleRotationAngle = 0.1;
+	
+	Player(BasisVector origin, float rotationAngle, int xpos, int ypos);
 
-		SnakeHead();
-		~SnakeHead();
-		void draw();
-		void move();
-		void handleInput();
-		void addPart(int partsToAdd);
-		void drawChildren();
-		bool isColliding(Apple* applePtr);
+	bool checkIfObjIsBehind(AGameObject& ago);
+	bool isWithinFOV(AGameObject& ago);
+
+	void PlayerRotate(float rotationAngle);
+	void draw();
+	void move(float speed);
+	void rotate(float freq, float ampl);
 };
 

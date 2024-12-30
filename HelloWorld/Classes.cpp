@@ -2,178 +2,163 @@
 #include "constants.h"
 #include "Play.h"
 
+#include "math.h"
 #include <stdexcept>
 
-Apple::Apple() {
-	radius = 10;
+Player::Player(BasisVector origin, float rotationAngle, int xpos, int ypos)
+	: origin(origin) {
+	basisI = { cos(rotationAngle), sin(rotationAngle) };
+	basisJ = { -sin(rotationAngle), cos(rotationAngle) };
 
-	pos.x = Play::RandomRollRange(radius, DISPLAY_WIDTH - radius);
-	pos.y = Play::RandomRollRange(radius, DISPLAY_HEIGHT - radius);
+	pos.x = xpos;
+	pos.y = ypos;
+
+
+	debugMode = false;
 }
 
-
-void Apple::draw() {
+void Player::draw() {
 	Play::DrawCircle({ pos.x, pos.y}, radius, Play::cRed);
+
+	float theta = 3.14159 / 4.f; // 45 degree turn
+
+	float rotatedX = basisI.x * cos(theta) - basisI.y * sin(theta);
+	float rotatedY = basisI.x * sin(theta) + basisI.y * cos(theta);	
+
+	// Draws facing direction
+	Play::DrawLine({ pos.x , pos.y },
+		{ rotatedX * 50 + pos.x, rotatedY * 50 + pos.y },
+		Play::cWhite);
+
+	//// //Draws facing direction
+	float theta2 = -(3.14159 / 4.f); // 45 degree turn
+	float rotatedX2 = basisI.x * cos(theta2) - basisI.y * sin(theta2);
+	float rotatedY2 = basisI.x * sin(theta2) + basisI.y * cos(theta2);
+
+	Play::DrawLine({ pos.x , pos.y },
+		{ rotatedX2 * 50 + pos.x, rotatedY2 * 50 + pos.y },
+		Play::cWhite);
+
+	// These uncommented lines make up a 2d object space 
+
+	if (debugMode) {
+		Play::DrawLine({ pos.x , pos.y },
+			{ (basisI.x) * 80 + pos.x, (basisI.y) * 80 + pos.y }, Play::cGreen);
+
+		Play::DrawLine({ pos.x, pos.y },
+			{ basisI.x * 80 + pos.x , basisI.y * 80 + pos.y }, Play::cBlue);
+
+		Play::DrawLine({ pos.x, pos.y },
+			{ -basisI.y * 80 + pos.x , basisI.x * 80 + pos.y }, Play::cOrange);
+
+		Play::DrawLine({ pos.x, pos.y },
+			{ -basisI.x * 80 + pos.x , -basisI.y * 80 + pos.y }, Play::cGreen);
+
+		Play::DrawLine({ pos.x, pos.y },
+			{ basisI.y * 80 + pos.x  , -basisI.x * 80 + pos.y }, Play::cMagenta);
+	}
+
+	// Press P to turn on lines
+	if (Play::KeyPressed(Play::KEY_P))
+		debugMode = !debugMode;
 }
 
-// SnakePart
-SnakePart::SnakePart(int x, int y) {
-	pos.x = x;
-	pos.y = y;
-
-	c.r = Play::RandomRollRange(20, 255);
-	c.g = Play::RandomRollRange(20, 255);
-	c.b = Play::RandomRollRange(20, 255);
+void AGameObject::draw() {
+	Play::DrawCircle({ pos.x, pos.y }, radius, 
+	{this->objColor.r, this->objColor.g, this->objColor.b });
 }
 
-SnakePart::SnakePart() {
-	pos.x = 0;
-	pos.y = 0;
-}
-
-void SnakePart::draw() {
-	Play::DrawCircle({ pos.x, pos.y }, 10, { c.r, c.g, c.b });
-}
-
-// SnakeHead
-SnakeHead::SnakeHead() {
-	pos.x = 50;
-	pos.y = 50;
-	radius = 10;
-	addPart(2);
-}
-
-SnakeHead::~SnakeHead() {
-	delete[] s;
-}
-
-void SnakeHead::draw() {
-	Play::DrawCircle({ pos.x, pos.y }, radius, Play::cBlue);
-}
-
-void SnakeHead::drawChildren() {
-	for (int i = 0; i < snakeparts; i++) {
-		s[i].draw();
+void Player::move(float speed) {
+	if (Play::KeyDown(Play::KEY_UP)) {
+		pos.y += speed;
 	}
-}
-
-void SnakeHead::handleInput() {
-	if (Play::KeyPressed(Play::KEY_UP)) {
-		h = Heading::NORTH;
+	if (Play::KeyDown(Play::KEY_DOWN)) {
+		pos.y -= speed;
 	}
-	if (Play::KeyPressed(Play::KEY_DOWN)) {
-		h = Heading::SOUTH;
+	if (Play::KeyDown(Play::KEY_LEFT)) {
+		pos.x -= speed;
 	}
-	if (Play::KeyPressed(Play::KEY_LEFT)) {
-		h = Heading::WEST;
-	}
-	if (Play::KeyPressed(Play::KEY_RIGHT)) {
-		h = Heading::EAST;
-	}
-}
-
-void SnakeHead::move() {
-	if (h == Heading::NORTH) {
-		pos.y += 15;
-	}
-	if (h == Heading::SOUTH) {
-		pos.y -= 15;
-	}
-	if (h == Heading::WEST) {
-		pos.x -= 15;
-	}
-	if (h == Heading::EAST) {
-		pos.x += 15;
-	}
-
-	for (int i = snakeparts - 1; i > 0; i--) {
-		s[i].pos.x = s[i - 1].pos.x;
-		s[i].pos.y = s[i - 1].pos.y;
-	}
-
-	s[0].pos.x = pos.x;
-	s[0].pos.y = pos.y;
-
-	draw();
-
-	for (int i = 0; i < snakeparts; i++) {
-		s[i].draw();
+	if (Play::KeyDown(Play::KEY_RIGHT)) {
+		pos.x += speed;
 	}
 }
 
-bool SnakeHead::isColliding(Apple* applePtr) {
-	int xDiff = int(pos.x) - (applePtr->pos.x);
-	int yDiff = int(pos.y) - (applePtr->pos.y);
+void Player::rotate(float freq, float ampl) {
+	float theta = (circleRotationAngle - 0.05) * freq;
 
-	int rad = applePtr->radius + radius;
+	float cosTheta = cos(theta);
+	float sinTheta = sin(theta);
 
-	return((xDiff * xDiff) + (yDiff * yDiff) < (rad * rad));
+	if (Play::KeyDown(Play::KEY_D)) {
+		PlayerRotate(-0.04f);
+		circleRotationAngle += 0.001;
+	}
+	if (Play::KeyDown(Play::KEY_A)) {
+		PlayerRotate(0.04f);
+		circleRotationAngle -= 0.001;
+	}
 }
 
-void SnakeHead::addPart(int partsToAdd) {
-	if (partsToAdd < 0) {
-		throw std::invalid_argument("Size to increase by has to be positive");
-	}
+bool Player::isWithinFOV(AGameObject & ago) {
+	float objMag = sqrt(pow(ago.pos.x, 2) + (ago.pos.y, 2));
+	float playerMag = sqrt(pow(pos.x, 2) + (pos.y, 2));
+	float directionMag = sqrt(pow(basisI.x, 2) + (basisI.y, 2));
 
-	int newSize = partsToAdd + snakeparts;
+	float r1 = ago.pos.x - pos.x; // row 1 of vector
+	float r2 = ago.pos.y - pos.y; // row 2 of vector
 
-	SnakePart* newParts = new SnakePart[newSize];  
-	for (int i = 0; i < snakeparts; i++) {
-		newParts[i] = s[i];  
-	}
+	float numerator = basisI.x * r1 + basisI.y * r2;
+	float denom = directionMag * sqrt(pow(r1, 2) + pow(r2, 2));
+	float dot = numerator / denom;
 
-	// necessary bolognuese cause head and tail are not the same
-	for (int i = snakeparts; i < newSize; i++) {  
-		if (snakeparts < 2) {
-			if (h == Heading::NORTH) {
-				newParts[i] = SnakePart(pos.x, pos.y - 15);
-			}
-			if (h == Heading::SOUTH) {
-				newParts[i] = SnakePart(pos.x, pos.y + 15);
-			}
-			if (h == Heading::WEST) {
-				newParts[i] = SnakePart(pos.x - 15, pos.y);
-			}
-			if (h == Heading::EAST) {
-				newParts[i] = SnakePart(pos.x + 15, pos.y);
-			}
-		}
-		else if (snakeparts >= 2){
-			if (h == Heading::NORTH) {
-			newParts[i] = SnakePart(s->pos.x, s->pos.y - 15);
-			}
-			if (h == Heading::SOUTH) {
-				newParts[i] = SnakePart(s->pos.x, s->pos.y + 15);
-			}
-			if (h == Heading::WEST) {
-				newParts[i] = SnakePart(s->pos.x - 15, s->pos.y);
-			}
-			if (h == Heading::EAST) {
-				newParts[i] = SnakePart(s->pos.x + 15, s->pos.y);
-			}
-		}
-	}
+	if (dot >= 0.40f)
+		return true;
+	else
+		return false;
 
-	delete[] s;
-
-	s = newParts;
-	snakeparts = newSize;
+	// dangerous to not have a base return statement in case the above aren't called
+	return false;
 }
 
- // Play.h reference for collision:
-//bool IsColliding(GameObject& object1, GameObject& object2)
-//{
-//	//Don't collide with noObject
-//	if (object1.type == -1 || object2.type == -1)
-//		return false;
-//
-//	int xDiff = int(object1.pos.x) - int(object2.pos.x);
-//	int yDiff = int(object1.pos.y) - int(object2.pos.y);
-//	int radii = object2.radius + object1.radius;
-//
-//	// Game progammers don't do square root!
-//	return((xDiff * xDiff) + (yDiff * yDiff) < radii * radii);
-//}
+void Player::PlayerRotate(float rotationAngle) {
+	// Compute rotation matrix components
+	float cosTheta = cos(rotationAngle);
+	float sinTheta = sin(rotationAngle);
 
+	// 2D rotation (Somewhere in chapter 4 or 5 I think for reference)
+	BasisVector newBasisI = {
+		basisI.x * cosTheta - basisI.y * sinTheta,
+		basisI.x * sinTheta + basisI.y * cosTheta
+	};
 
+	BasisVector newBasisJ = {
+		basisJ.x * cosTheta - basisJ.y * sinTheta,
+		basisJ.x * sinTheta + basisJ.y * cosTheta
+	};
 
+	// Update the basis vectors
+	basisI = newBasisI;
+	basisJ = newBasisJ;
+}
+
+bool Player::checkIfObjIsBehind(AGameObject& ago) {
+	// ago - pos of player gives a vector k
+	// dot product of vector k and 
+	// forward vector: { basisI.x + pos.x , basisI.y + pos.y } 
+
+	float i = ago.pos.x - pos.x;
+	float j = ago.pos.y - pos.y;
+	float dot = i * basisI.x + j * basisI.y;
+
+	if (dot >= 0)
+		return false;
+	else if (dot < 0)
+		return true;
+
+	// dangerous to not have a base return statement in case the above aren't called
+	return false;
+
+	//pseudo code:
+	// fov = (a * b) / (||a||||b||) * cos(phi) 
+	// if(fov / 2 > cos(90)) then  we are within FOV
+}
